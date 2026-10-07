@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hb Colour Scale Scanner</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#131c2e; --panel2:#1a2640; --line:#2c3b5c;
+    --text:#f5f8ff; --muted:#aab6d0; --accent:#ffd33d; --accent-ink:#1a1400;
+    --red:#e5262b; --orange:#ff9f1a; --green:#1fa851; --blue:#2f80ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4}
+  .app{max-width:760px;margin:0 auto;padding:12px 12px 32px}
+  header{display:flex;align-items:center;gap:10px;padding:6px 2px 12px}
+  header h1{font-size:1.25rem;margin:0}
+  header small{color:var(--muted);display:block;font-size:.8rem}
+  .logo{width:40px;height:40px;border-radius:12px;background:var(--red);display:grid;place-items:center;font-weight:800}
+  .card{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:12px;margin-bottom:12px}
+  .hidden{display:none!important}
+  button,.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px 16px;min-height:52px;
+    cursor:pointer;background:var(--panel2);color:var(--text);border:2px solid var(--line);
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+  button:focus-visible,.btn:focus-visible,select:focus-visible{outline:4px solid var(--blue);outline-offset:2px}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  button.danger{background:transparent;border-color:var(--red);color:#ff8a8d}
+  button[disabled]{opacity:.45;cursor:not-allowed}
+  button.on{background:#fff;color:#111;border-color:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{flex:1 1 140px}
+  select{font:inherit;min-height:52px;border-radius:12px;background:var(--panel2);color:var(--text);
+    border:2px solid var(--line);padding:0 10px;width:100%}
+
+  .viewport{position:relative;background:#000;border-radius:14px;overflow:hidden;
+    border:10px solid transparent;transition:border-color .15s, box-shadow .15s}
+  .viewport.screenflash{border-color:#fff;box-shadow:0 0 40px 10px #fff inset, 0 0 30px 6px rgba(255,255,255,.8)}
+  video{display:block;width:100%;max-height:60vh;object-fit:cover;background:#000;aspect-ratio:4/3}
+  .guide{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center}
+  .guide div{width:50%;height:85%;border:3px dashed var(--accent);border-radius:14px;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
+  .guide span{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:.85rem;
+    background:rgba(0,0,0,.55);padding:4px}
+
+  .alert{border-radius:12px;padding:12px;margin:10px 0;font-size:.95rem;border:2px solid}
+  .alert.warn{background:#3a2a00;border-color:var(--orange);color:#ffe3b0}
+  .alert.err{background:#3a0b0d;border-color:var(--red);color:#ffd0d1}
+  .alert.info{background:#0e2547;border-color:var(--blue);color:#cfe2ff}
+  .alert ul{margin:6px 0 0 18px;padding:0}
+
+  .steps{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .step{flex:1 1 45%;border:2px solid var(--line);border-radius:12px;padding:10px;background:var(--panel2);font-size:.9rem}
+  .step b{display:block;font-size:.75rem;color:var(--muted);letter-spacing:.06em}
+  .step.active{border-color:var(--accent);background:#2b2500}
+  .step.done{border-color:var(--green)}
+  .step.done b::after{content:" ✓";color:var(--green)}
+  .canvas-wrap{border-radius:14px;overflow:hidden;border:3px solid var(--line);background:#000;touch-action:manipulation}
+  canvas#view{display:block;width:100%;height:auto;cursor:crosshair}
+
+  .result{border-radius:16px;padding:18px;text-align:center;border:4px solid}
+  .result .num{font-size:4.5rem;font-weight:900;line-height:1}
+  .result .unit{font-size:1.1rem;font-weight:700}
+  .result .tier{font-size:1.35rem;font-weight:800;margin-top:8px}
+  .result .advice{margin-top:8px;font-size:.95rem}
+  .result.red{background:#4a0709;border-color:var(--red);color:#ffdadb}
+  .result.orange{background:#4a2c00;border-color:var(--orange);color:#ffe9c7}
+  .result.green{background:#062e17;border-color:var(--green);color:#d3f7e1}
+  .result.red .num{color:#ff5b60}.result.orange .num{color:#ffb84d}.result.green .num{color:#53e08a}
+  .ladder{display:flex;gap:6px;margin:12px 0 4px;align-items:flex-end}
+  .lad{flex:1;text-align:center;font-size:.8rem}
+  .lad .sw{display:block;height:34px;border-radius:6px;border:2px solid #fff;margin-bottom:3px}
+  .lad.stain .sw{border-color:var(--accent);border-width:3px}
+  .lad.stain{flex:1.3}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:10px}
+  td{padding:4px 6px;border-bottom:1px solid var(--line)}
+  td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  label.cut{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+  footer{font-size:.78rem;color:var(--muted);border-top:2px solid var(--line);padding-top:12px;margin-top:18px}
+  h2{font-size:1.05rem;margin:0 0 8px}
+  .toast{position:fixed;left:12px;right:12px;bottom:16px;max-width:600px;margin:0 auto;z-index:50;
+    background:#3a2a00;border:2px solid var(--orange);color:#ffe3b0;padding:14px;border-radius:12px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo" aria-hidden="true">Hb</div>
+    <div><h1>Hb Colour Scale Scanner</h1><small>WHO Haemoglobin Colour Scale reader for ANMs • works offline</small></div>
+  </header>
+
+  <!-- ===== A: Capture ===== -->
+  <section id="captureSection" class="card" aria-label="Camera">
+    <h2>1. Photograph the colour scale with the blood strip</h2>
+    <div class="alert info">
+      Put the blood strip behind the scale so the stain shows through the holes. Wait about 30 seconds, then photograph straight away.
+      Hold the phone parallel to the card, 15–20 cm away. Avoid direct sunlight, shadows (including your own) and glare on the card.
+    </div>
+    <div id="camAlert"></div>
+
+    <div id="camBlock">
+      <div id="viewport" class="viewport">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="guide"><div></div><span>Fit the whole colour scale inside the box • hold steady</span></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnCapture" class="primary" disabled>📸 Capture Snapshot</button>
+        <button id="btnFlash" disabled>🔦 Flash: Off</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="cameraSelect" aria-label="Choose camera" disabled><option>Looking for cameras…</option></select>
+      </div>
+      <div id="flashNote" class="alert info hidden"></div>
+    </div>
+
+    <div id="uploadBlock" style="margin-top:10px">
+      <input id="fileInputNoCap" type="file" accept="image/*" class="hidden">
+      <div class="row">
+        <button id="btnUpload">📂 Upload / Take Photo</button>
+        <button id="btnRetryCam" class="hidden">🔄 Retry Camera</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== B: Tap workflow ===== -->
+  <section id="sampleSection" class="card hidden" aria-label="Sampling">
+    <h2>2. Tap four spots, in order</h2>
+    <div class="steps">
+      <div id="st1" class="step active"><b>STEP 1</b>Tap a <u>WHITE</u> area (white paper or white strip) as the lighting reference.</div>
+      <div id="st2" class="step"><b>STEP 2</b>Tap the <u>DARKEST</u> shade (14 g/dL), beside the hole, not on it.</div>
+      <div id="st3" class="step"><b>STEP 3</b>Tap the <u>LIGHTEST</u> shade (4 g/dL), beside the hole.</div>
+      <div id="st4" class="step"><b>STEP 4</b>Tap the <u>BLOOD STAIN</u> seen through a hole.</div>
+    </div>
+    <div class="canvas-wrap"><canvas id="view"></canvas></div>
+    <div id="sampleAlert"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnResetTaps">↩ Redo taps</button>
+      <button id="btnRetake" class="danger">✖ Retake / New card</button>
+    </div>
+  </section>
+
+  <!-- ===== C: Result ===== -->
+  <section id="resultSection" class="card hidden" aria-live="polite" aria-label="Result">
+    <h2>3. Result</h2>
+    <div id="result" class="result green">
+      <div><span id="resNum" class="num">--</span> <span class="unit">g/dL</span></div>
+      <div id="resTier" class="tier"></div>
+      <div id="resAdvice" class="advice"></div>
+    </div>
+    <div id="ladderRow" class="ladder" aria-label="Scale shades and stain colour after lighting correction"></div>
+    <label class="cut" for="cutoff">“Normal” starts at:</label>
+    <select id="cutoff">
+      <option value="11">11.0 g/dL</option>
+      <option value="12">12.0 g/dL (as printed on this card)</option>
+    </select>
+    <table id="detail"></table>
+    <div id="calibWarn"></div>
+    <p style="font-size:.85rem;color:var(--muted)">To measure a different hole, tap the stain again on the picture above.</p>
+  </section>
+
+  <footer>
+    <strong>Medical screening disclaimer:</strong> This tool is a screening aid only and is <u>not</u> a diagnostic device.
+    The colour scale is an approximate method and phone-camera reading adds further error from lighting, camera and technique.
+    Results must never replace a laboratory or HemoCue haemoglobin test or clinical judgement. Anyone with a low or critical
+    reading, with symptoms (breathlessness, pallor, dizziness) or who is pregnant should be referred to a Medical Officer /
+    health facility for confirmatory testing and treatment. Follow national (MoHFW / Anemia Mukt Bharat) protocols.
+  </footer>
+</div>
+
+<div id="toast" class="toast hidden" role="alert"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   CONFIGURATION
+   ============================================================ */
+var TARGET_WHITE = 240;                    // target reflectance for the white reference (per spec)
+var SCALE_HB = [14,12,10,8,6,4];           // WHO Haemoglobin Colour Scale shades, darkest -> lightest
+var DE_GOOD = 6, DE_FAIR = 12;             // stain-to-scale colour distance thresholds (CIE Lab units)
+var DE_REJECT = 20;                        // beyond this the stain is not on the scale at all: show no number
+
+/* BEGIN-PURE */
+function srgbToLab(r,g,b){
+  function lin(c){c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+  var R=lin(r),G=lin(g),B=lin(b);
+  var X=(R*0.4124564+G*0.3575761+B*0.1804375)/0.95047;
+  var Y=(R*0.2126729+G*0.7151522+B*0.0721750);
+  var Z=(R*0.0193339+G*0.1191920+B*0.9503041)/1.08883;
+  function f(t){return t>0.008856?Math.cbrt(t):(7.787*t+16/116);}
+  var fx=f(X),fy=f(Y),fz=f(Z);
+  return {L:116*fy-16,a:500*(fx-fy),b:200*(fy-fz)};
+}
+/* Per-channel multiplicative correction: ratio = TARGET_WHITE / reference patch channel */
+function correctRGB(px, ref, target){
+  function c(v){return Math.max(0,Math.min(255,v));}
+  return {r:c(px.r*target/Math.max(ref.r,1)), g:c(px.g*target/Math.max(ref.g,1)), b:c(px.b*target/Math.max(ref.b,1))};
+}
+/* Is the 6-shade ladder really dark -> light? (allows 2 L* units of sampling noise) */
+function ladderOK(labs){
+  for(var i=0;i<labs.length-1;i++){ if(labs[i+1].L < labs[i].L - 2) return false; }
+  return true;
+}
+/* Place the stain on the 6-shade ladder: nearest point on the polyline joining shade colours in Lab space. */
+function estimateFromLadder(ladderLab, stainLab, hbs){
+  var best=null, n=ladderLab.length;
+  for(var i=0;i<n-1;i++){
+    var A=ladderLab[i],B=ladderLab[i+1];
+    var dx=B.L-A.L,dy=B.a-A.a,dz=B.b-A.b;
+    var len2=dx*dx+dy*dy+dz*dz; if(len2<1e-6) continue;
+    var t=((stainLab.L-A.L)*dx+(stainLab.a-A.a)*dy+(stainLab.b-A.b)*dz)/len2;
+    var tc=Math.max(0,Math.min(1,t));
+    var px=A.L+dx*tc,py=A.a+dy*tc,pz=A.b+dz*tc;
+    var d=Math.sqrt(Math.pow(stainLab.L-px,2)+Math.pow(stainLab.a-py,2)+Math.pow(stainLab.b-pz,2));
+    if(!best||d<best.dE) best={seg:i,t:t,tc:tc,dE:d};
+  }
+  if(!best) throw new Error("Scale shades are indistinguishable");
+  var hb=hbs[best.seg]+(hbs[best.seg+1]-hbs[best.seg])*best.tc;
+  var flag=null;
+  if(best.seg===0 && best.t<-0.25) flag="high";          // darker than the 14 shade
+  if(best.seg===n-2 && best.t>1.25) flag="low";          // paler than the 4 shade
+  return {hb:hb,dE:best.dE,flag:flag,seg:best.seg,t:best.t};
+}
+function tierFor(hb,cut){
+  if(hb<7.0) return "red";
+  if(hb<cut) return "orange";
+  return "green";
+}
+/* END-PURE */
+
+/* ============================ State ============================ */
+var state = {
+  stream:null, track:null, torchSupported:false, torchOn:false, screenFlashOn:false,
+  snapshot:null,
+  taps:{ref:null,top:null,bottom:null,sample:null},
+  step:1, deviceId:null, last:null
+};
+
+var $ = function(id){return document.getElementById(id);};
+var video=$("video"), viewport=$("viewport"), view=$("view"), vctx=view.getContext("2d");
+
+function showAlert(el, kind, html){ el.innerHTML = '<div class="alert '+kind+'">'+html+'</div>'; }
+function clearAlert(el){ el.innerHTML=""; }
+var toastTimer=null;
+function toast(msg){
+  var t=$("toast"); t.textContent=msg; t.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.add("hidden");},3500);
+}
+function show(el){el.classList.remove("hidden");}
+function hide(el){el.classList.add("hidden");}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+
+/* ============================ Camera ============================ */
+function troubleshootingHTML(reason){
+  return '<strong>Camera not available.</strong> '+ (reason?('<em>'+escapeHtml(reason)+'</em><br>'):'') +
+   'Try the following:<ul>'+
+   '<li>Tap <b>Allow</b> when the browser asks for camera permission (check the 🔒 icon in the address bar).</li>'+
+   '<li>Close other apps using the camera (video calls, other tabs).</li>'+
+   '<li>Open this page in Chrome or Safari; on a web server it must be <b>https://</b> (a local file also works in Chrome).</li>'+
+   '<li>Use <b>Upload / Take Photo</b> below — it works without live camera access.</li></ul>';
+}
+
+function cameraFailed(err){
+  stopStream();
+  var reason = err && (err.name||err.message) ? (err.name + (err.message?": "+err.message:"")) : "";
+  showAlert($("camAlert"),"err",troubleshootingHTML(reason));
+  hide($("camBlock"));
+  show($("btnRetryCam"));
+  $("btnUpload").classList.add("primary");
+  try{ $("fileInputNoCap").click(); }catch(e){ /* needs a user gesture on some browsers; button is highlighted instead */ }
+}
+
+async function startCamera(deviceId){
+  clearAlert($("camAlert")); show($("camBlock")); hide($("btnRetryCam"));
+  stopStream();
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      throw new Error("Camera API unavailable in this browser / connection (needs HTTPS).");
+    }
+    var constraints = { audio:false, video: deviceId
+      ? { deviceId:{exact:deviceId}, width:{ideal:1920}, height:{ideal:1080} }
+      : { facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080} } };
+    var stream;
+    try{ stream = await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e1){
+      if(e1 && (e1.name==="OverconstrainedError"||e1.name==="NotFoundError")){
+        stream = await navigator.mediaDevices.getUserMedia({audio:false,video:true});
+      } else { throw e1; }
+    }
+    state.stream = stream;
+    state.track = stream.getVideoTracks()[0] || null;
+    if(!state.track) throw new Error("No video track found.");
+    video.srcObject = stream;
+    try{ await video.play(); }catch(e){}
+    $("btnCapture").disabled = false;
+    await tryFocus();
+    setupTorch();
+    await listCameras();
+  }catch(err){
+    cameraFailed(err);
+  }
+}
+
+function stopStream(){
+  try{ if(state.torchOn) setTorch(false); }catch(e){}
+  try{ if(state.stream){ state.stream.getTracks().forEach(function(t){t.stop();}); } }catch(e){}
+  state.stream=null; state.track=null; state.torchOn=false;
+  setScreenFlash(false);
+  $("btnCapture").disabled = true;
+}
+
+async function tryFocus(){
+  try{
+    var caps = state.track.getCapabilities ? state.track.getCapabilities() : {};
+    var adv = [];
+    if(caps.focusMode && caps.focusMode.indexOf("continuous")>-1) adv.push({focusMode:"continuous"});
+    if(caps.focusDistance && typeof caps.focusDistance.min==="number"){
+      adv.push({focusDistance: Math.min(caps.focusDistance.max, caps.focusDistance.min + (caps.focusDistance.max-caps.focusDistance.min)*0.15)});
+    }
+    for(var i=0;i<adv.length;i++){ try{ await state.track.applyConstraints({advanced:[adv[i]]}); }catch(e){} }
+  }catch(e){}
+}
+
+async function listCameras(){
+  try{
+    var devs = await navigator.mediaDevices.enumerateDevices();
+    var cams = devs.filter(function(d){return d.kind==="videoinput";});
+    var sel = $("cameraSelect"); sel.innerHTML="";
+    cams.forEach(function(d,i){
+      var o=document.createElement("option"); o.value=d.deviceId;
+      o.textContent = d.label || ("Camera "+(i+1)); sel.appendChild(o);
+    });
+    var cur = state.track && state.track.getSettings ? state.track.getSettings().deviceId : null;
+    if(cur) sel.value = cur;
+    sel.disabled = cams.length<2;
+  }catch(e){ $("cameraSelect").disabled=true; }
+}
+
+/* ============================ Torch / screen flash ============================ */
+function setupTorch(){
+  state.torchSupported=false;
+  var btn=$("btnFlash"), note=$("flashNote");
+  try{
+    var caps = state.track && state.track.getCapabilities ? state.track.getCapabilities() : {};
+    state.torchSupported = !!caps.torch;
+  }catch(e){ state.torchSupported=false; }
+  btn.disabled=false;
+  updateFlashButton();
+  if(!state.torchSupported){
+    note.innerHTML = "ℹ️ No LED torch available on this device/browser. Tap the flash button for a <b>Digital Screen Flash</b> (bright white border) to light the card.";
+    show(note);
+  } else { hide(note); }
+}
+async function setTorch(on){
+  if(!state.track) throw new Error("no track");
+  await state.track.applyConstraints({advanced:[{torch:!!on}]});
+  state.torchOn=!!on;
+}
+function setScreenFlash(on){
+  state.screenFlashOn=!!on;
+  viewport.classList.toggle("screenflash", !!on);
+}
+function updateFlashButton(){
+  var b=$("btnFlash"), active = state.torchOn || state.screenFlashOn;
+  b.classList.toggle("on", active);
+  b.textContent = (state.torchSupported && !state.screenFlashOn ? "🔦 Torch: " : "💡 Screen Flash: ") + (active?"On":"Off");
+}
+async function toggleFlash(){
+  var turnOn = !(state.torchOn || state.screenFlashOn);
+  if(state.torchSupported){
+    try{
+      await setTorch(turnOn);
+      setScreenFlash(false);
+      updateFlashButton(); return;
+    }catch(e){
+      state.torchSupported=false; state.torchOn=false;
+      $("flashNote").innerHTML="ℹ️ Phone torch could not be used here. Switched to <b>Digital Screen Flash</b> (white border).";
+      show($("flashNote"));
+    }
+  }
+  setScreenFlash(turnOn);
+  updateFlashButton();
+}
+
+/* ============================ Snapshot / upload ============================ */
+function captureSnapshot(){
+  try{
+    if(!video.videoWidth || !video.videoHeight) throw new Error("Video not ready yet");
+    var c=document.createElement("canvas");
+    c.width=video.videoWidth; c.height=video.videoHeight;
+    c.getContext("2d").drawImage(video,0,0,c.width,c.height);
+    state.snapshot=c;
+    video.pause();
+    beginSampling();
+  }catch(e){
+    toast("Could not capture the frame. Please wait a second and try again.");
+  }
+}
+function handleFile(file){
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ toast("Please choose an image file (JPG/PNG)."); return; }
+  var url=URL.createObjectURL(file), img=new Image();
+  img.onload=function(){
+    try{
+      var max=2400, s=Math.min(1, max/Math.max(img.naturalWidth,img.naturalHeight));
+      var c=document.createElement("canvas");
+      c.width=Math.round(img.naturalWidth*s); c.height=Math.round(img.naturalHeight*s);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      state.snapshot=c;
+      URL.revokeObjectURL(url);
+      stopStream();
+      beginSampling();
+    }catch(e){ toast("Could not read that image. Try another photo."); }
+  };
+  img.onerror=function(){ URL.revokeObjectURL(url); toast("That image could not be opened."); };
+  img.src=url;
+}
+
+/* ============================ Four-tap sampling ============================ */
+function beginSampling(){
+  state.taps={ref:null,top:null,bottom:null,sample:null}; state.step=1; state.last=null;
+  hide($("resultSection")); clearAlert($("sampleAlert"));
+  view.width=state.snapshot.width; view.height=state.snapshot.height;
+  show($("sampleSection")); updateSteps(); redraw();
+  $("sampleSection").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function updateSteps(){
+  var done=[state.taps.ref,state.taps.top,state.taps.bottom,state.taps.sample];
+  for(var i=1;i<=4;i++){
+    $("st"+i).className="step"+(state.step===i?" active":"")+(done[i-1]?" done":"");
+  }
+}
+function ladderPoints(){
+  var T=state.taps, pts=[];
+  for(var i=0;i<SCALE_HB.length;i++){
+    var f=i/(SCALE_HB.length-1);
+    pts.push({x:T.top.x+(T.bottom.x-T.top.x)*f, y:T.top.y+(T.bottom.y-T.top.y)*f});
+  }
+  return pts;
+}
+function redraw(){
+  vctx.clearRect(0,0,view.width,view.height);
+  vctx.drawImage(state.snapshot,0,0);
+  var r=Math.max(9, view.width*0.016);
+  function marker(p,color,label,small){
+    if(!p) return;
+    var rr=small?r*0.55:r;
+    vctx.lineWidth=Math.max(3,rr*0.25);
+    vctx.strokeStyle="#000"; vctx.beginPath(); vctx.arc(p.x,p.y,rr+vctx.lineWidth,0,7); vctx.stroke();
+    vctx.strokeStyle=color; vctx.beginPath(); vctx.arc(p.x,p.y,rr,0,7); vctx.stroke();
+    if(label){
+      vctx.font="bold "+Math.round(r*1.3)+"px sans-serif"; vctx.fillStyle=color;
+      vctx.strokeStyle="#000"; vctx.lineWidth=4;
+      vctx.strokeText(label,p.x+rr*1.5,p.y-rr*1.1); vctx.fillText(label,p.x+rr*1.5,p.y-rr*1.1);
+    }
+  }
+  var T=state.taps;
+  if(T.top && T.bottom){
+    ladderPoints().forEach(function(p,i){
+      marker(p,"#ffd33d",String(SCALE_HB[i]),i!==0&&i!==SCALE_HB.length-1);
+    });
+  } else {
+    marker(T.top,"#ffd33d","14"); marker(T.bottom,"#ffd33d","4");
+  }
+  marker(T.ref,"#ffffff","WHITE");
+  marker(T.sample,"#00e5ff","STAIN");
+}
+
+function eventToImageXY(ev){
+  var rect=view.getBoundingClientRect();
+  if(!rect.width||!rect.height) throw new Error("Canvas has no size");
+  var cx = (ev.touches&&ev.touches[0]) ? ev.touches[0].clientX : (ev.changedTouches&&ev.changedTouches[0]?ev.changedTouches[0].clientX:ev.clientX);
+  var cy = (ev.touches&&ev.touches[0]) ? ev.touches[0].clientY : (ev.changedTouches&&ev.changedTouches[0]?ev.changedTouches[0].clientY:ev.clientY);
+  var x=(cx-rect.left)*(view.width/rect.width);
+  var y=(cy-rect.top)*(view.height/rect.height);
+  if(!isFinite(x)||!isFinite(y)) throw new Error("Bad coordinates");
+  if(x<0||y<0||x>=view.width||y>=view.height) throw new Error("Outside image");
+  return {x:x,y:y};
+}
+
+function onTap(ev){
+  clearAlert($("sampleAlert"));
+  var p;
+  try{ p=eventToImageXY(ev); }
+  catch(e){ showAlert($("sampleAlert"),"warn","⚠️ Please tap inside the test card zone."); return; }
+  var T=state.taps;
+  if(state.step===1){ T.ref=p; state.step=2; }
+  else if(state.step===2){ T.top=p; state.step=3; }
+  else if(state.step===3){
+    var minSep=Math.min(view.width,view.height)*0.1;
+    if(Math.hypot(p.x-T.top.x,p.y-T.top.y)<minSep){
+      showAlert($("sampleAlert"),"warn","⚠️ That is too close to the first shade tap. Tap the <b>lightest</b> shade (4 g/dL) at the other end of the scale.");
+      return;
+    }
+    T.bottom=p; state.step=4;
+  } else {
+    T.sample=p; state.step=4;
+    updateSteps(); redraw();
+    try{ computeAndShow(); }
+    catch(e){
+      if(e && e.message==="LADDER"){
+        showAlert($("sampleAlert"),"warn","⚠️ The six shade points do not run from dark to light. Press <b>Redo taps</b> and tap the centre of the darkest and lightest shades, beside the holes, with the whole scale in view.");
+      } else if(e && e.message==="NOMATCH"){
+        showAlert($("sampleAlert"),"warn","⚠️ That spot is not the colour of any shade on the scale, so no result is shown. Tap the <b>red blood stain</b> seen through a hole (a white hole means no blood is behind it), or retake the photo in even light.");
+      } else {
+        showAlert($("sampleAlert"),"warn","⚠️ Please tap inside the test card zone. ("+escapeHtml(e.message||"calculation failed")+")");
+      }
+      T.sample=null; hide($("resultSection"));
+    }
+    updateSteps(); redraw();
+    return;
+  }
+  updateSteps(); redraw();
+}
+
+/* Median RGB in a square patch around p. Median resists glare specks and dust. */
+function samplePatch(p, frac){
+  var w=state.snapshot.width, h=state.snapshot.height;
+  var rad=Math.max(2, Math.round(Math.min(w,h)*frac));
+  var x0=Math.round(p.x)-rad, y0=Math.round(p.y)-rad, size=rad*2+1;
+  if(x0<0||y0<0||x0+size>w||y0+size>h) throw new Error("Patch too close to image edge");
+  var data;
+  try{ data=state.snapshot.getContext("2d").getImageData(x0,y0,size,size).data; }
+  catch(e){ throw new Error("Could not read pixels"); }
+  var R=[],G=[],B=[];
+  for(var i=0;i<data.length;i+=4){ R.push(data[i]);G.push(data[i+1]);B.push(data[i+2]); }
+  function med(a){a.sort(function(m,n){return m-n;});return a[a.length>>1];}
+  return {r:med(R),g:med(G),b:med(B)};
+}
+
+/* ============================ Compute ============================ */
+function computeAndShow(){
+  var T=state.taps;
+  if(!T.ref||!T.top||!T.bottom||!T.sample) throw new Error("All four taps are needed");
+  var ref=samplePatch(T.ref,0.008);
+  var rawLadder=ladderPoints().map(function(p){return samplePatch(p,0.005);});
+  var rawStain=samplePatch(T.sample,0.004);
+
+  var warns=[];
+  var refMin=Math.min(ref.r,ref.g,ref.b), refMax=Math.max(ref.r,ref.g,ref.b);
+  if(refMax>=250) warns.push("The white reference looks over-exposed (glare). Retake without direct reflection on the card.");
+  if(refMax<90)   warns.push("The white reference is very dark. Add light or move away from shadows.");
+  if(refMax-refMin>70) warns.push("The white reference is strongly coloured. Check you tapped a white area, and avoid coloured light.");
+
+  var corLadder=rawLadder.map(function(c){return correctRGB(c,ref,TARGET_WHITE);});
+  var corStain=correctRGB(rawStain,ref,TARGET_WHITE);
+  var ladderLab=corLadder.map(function(c){return srgbToLab(c.r,c.g,c.b);});
+  var stainLab=srgbToLab(corStain.r,corStain.g,corStain.b);
+  if(!ladderOK(ladderLab)) throw new Error("LADDER");
+
+  var est=estimateFromLadder(ladderLab,stainLab,SCALE_HB);
+  if(est.dE>DE_REJECT) throw new Error("NOMATCH");
+  if(est.dE>DE_FAIR) warns.push("The stain colour does not match the scale well. Check a blood strip is behind the hole, you waited about 30 seconds, and the lighting is even. Consider retaking.");
+  if(est.flag==="low" && est.dE<=DE_FAIR) warns.push("The stain is paler than the 4 g/dL shade.");
+
+  state.last={ref:ref,rawLadder:rawLadder,rawStain:rawStain,corLadder:corLadder,corStain:corStain,est:est,warns:warns};
+  renderResult();
+}
+
+/* ============================ Result UI ============================ */
+function rgbCss(c){return "rgb("+Math.round(c.r)+","+Math.round(c.g)+","+Math.round(c.b)+")";}
+function renderResult(){
+  var L=state.last; if(!L) return;
+  var cut=parseFloat($("cutoff").value)||11;
+  var est=L.est;
+  var hb=Math.round(est.hb*2)/2;                        // WHO scale is coarse: report to nearest 0.5
+  var cls=tierFor(hb,cut), tier, advice;
+  if(cls==="red"){ tier="🔴 CRITICAL / SEVERE ANAEMIA"; advice="Refer URGENTLY to a health facility / Medical Officer today. Confirm with a lab or HemoCue test."; }
+  else if(cls==="orange"){ tier="🟠 MILD–MODERATE ANAEMIA"; advice="Confirm with HemoCue / lab test. Start or continue IFA per protocol, counsel on diet, and arrange follow-up."; }
+  else { tier="🟢 NORMAL RANGE"; advice="No anaemia indicated by this screen. Continue routine IFA and nutrition counselling."; }
+
+  $("result").className="result "+cls;
+  $("resNum").textContent = est.flag==="high" ? "14+" : (est.flag==="low" ? "<4" : hb.toFixed(1));
+  $("resTier").textContent=tier;
+  var extra="";
+  if(est.flag==="high") extra=" The scale cannot show values above 14 g/dL.";
+  if(Math.abs(hb-7)<=0.5 || Math.abs(hb-cut)<=0.5) extra+=" Borderline reading: confirm with a lab or HemoCue test.";
+  $("resAdvice").textContent=advice+extra;
+
+  var html="";
+  L.corLadder.forEach(function(c,i){
+    html+='<div class="lad"><span class="sw" style="background:'+rgbCss(c)+'"></span><b>'+SCALE_HB[i]+'</b></div>';
+  });
+  html+='<div class="lad stain"><span class="sw" style="background:'+rgbCss(L.corStain)+'"></span><b>Stain</b></div>';
+  $("ladderRow").innerHTML=html;
+
+  function fmt(c){return Math.round(c.r)+", "+Math.round(c.g)+", "+Math.round(c.b);}
+  var q = est.dE<=DE_GOOD ? "Good" : (est.dE<=DE_FAIR ? "Fair" : "Poor");
+  $("detail").innerHTML =
+    '<tr><td>Colour match to scale</td><td>'+q+' (ΔE '+est.dE.toFixed(1)+')</td></tr>'+
+    '<tr><td>Raw estimate before rounding</td><td>'+est.hb.toFixed(1)+' g/dL</td></tr>'+
+    '<tr><td>White reference (raw RGB)</td><td>'+fmt(L.ref)+'</td></tr>'+
+    '<tr><td>Stain (raw → corrected RGB)</td><td>'+fmt(L.rawStain)+' → '+fmt(L.corStain)+'</td></tr>';
+
+  var msgs=["The WHO colour scale is an approximate method; treat the number as a screening estimate (reported to the nearest 0.5 g/dL)."];
+  L.warns.forEach(function(w){msgs.push("⚠️ "+escapeHtml(w));});
+  $("calibWarn").innerHTML='<div class="alert warn">'+msgs.join("<br><br>")+'</div>';
+  show($("resultSection"));
+  $("resultSection").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+/* ============================ Reset / navigation ============================ */
+function redoTaps(){
+  state.taps={ref:null,top:null,bottom:null,sample:null}; state.step=1; state.last=null;
+  clearAlert($("sampleAlert")); hide($("resultSection")); updateSteps(); redraw();
+}
+function retake(){
+  state.snapshot=null; state.taps={ref:null,top:null,bottom:null,sample:null}; state.last=null;
+  hide($("sampleSection")); hide($("resultSection"));
+  window.scrollTo({top:0,behavior:"smooth"});
+  if(video.srcObject && state.stream){ try{video.play();}catch(e){} $("btnCapture").disabled=false; }
+  else if(!$("camBlock").classList.contains("hidden")) startCamera(state.deviceId);
+}
+
+/* ============================ Wire-up ============================ */
+$("btnCapture").addEventListener("click", captureSnapshot);
+$("btnFlash").addEventListener("click", function(){ toggleFlash(); });
+$("btnUpload").addEventListener("click", function(){ $("fileInputNoCap").click(); });
+$("fileInputNoCap").addEventListener("change", function(e){ handleFile(e.target.files[0]); e.target.value=""; });
+$("btnRetryCam").addEventListener("click", function(){ $("btnUpload").classList.remove("primary"); startCamera(state.deviceId); });
+$("cameraSelect").addEventListener("change", function(e){ state.deviceId=e.target.value; startCamera(state.deviceId); });
+$("btnResetTaps").addEventListener("click", redoTaps);
+$("btnRetake").addEventListener("click", retake);
+$("cutoff").addEventListener("change", renderResult);
+view.addEventListener("click", onTap);
+
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden && state.torchOn){ try{ setTorch(false); updateFlashButton(); }catch(e){} }
+});
+window.addEventListener("pagehide", stopStream);
+
+startCamera(null);
+})();
+</script>
+</body>
+</html>
